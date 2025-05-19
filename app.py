@@ -5,7 +5,7 @@ from agents.query_agent import process_question
 
 st.set_page_config(page_title="Lighthouse AI", layout="centered")
 
-st.title("💡 Lighthouse AI")
+st.title("💡 HybridOcean AI")
 st.markdown("Ask anything about your loyalty program data 👇")
 
 # User input
@@ -15,7 +15,7 @@ if st.button("🔍 Ask"):
     if not question.strip():
         st.warning("Please enter a question.")
     else:
-        with st.spinner("Thinking..."):
+        with st.spinner("Analysing..."):
             response = process_question(question)
 
         if "error" in response:

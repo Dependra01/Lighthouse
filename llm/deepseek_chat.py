@@ -4,7 +4,7 @@ from config.ollama_config import chat_with_model
 from .examples import few_shot_examples
 # 🧠 Context we give the model (system prompt)
 SYSTEM_PROMPT = """
-You are Lighthouse AI, a data-savvy assistant that answers questions using a PostgreSQL loyalty program database.
+You are HybridOcean AI, a data-savvy assistant that answers questions using a PostgreSQL loyalty program database.
 
 You NEVER guess. You analyze the user’s intent and generate relevant SQL queries ONLY if data exists.
 
@@ -235,13 +235,17 @@ User: Could you provide a breakdown of user count by each user type?
 SQL: SELECT user_type AS "User Type", COUNT(*) AS "Total" FROM app_users GROUP BY user_type;
 
 User: Which fabricator recorded the highest number of scans in February?
-SQL: SELECT au.name as "Name", au.mobile as "Mobile", COUNT(1) as "Total Scan"
-FROM user_point_entries upe
-LEFT JOIN app_users au ON au.id = upe.app_user_id 
-WHERE DATE(upe.created_at) >= '2025-02-01' AND DATE(upe.created_at) <= '2025-02-28'
-GROUP BY upe.app_user_id, au.name, au.mobile
-ORDER BY COUNT(1) DESC
-LIMIT 1;
+SQL:  SELECT 
+      au.id AS "User ID", 
+      au.name AS "Fabricator Name", 
+      au.mobile AS "Mobile Number", 
+      COUNT(1) AS "Total Scans" 
+    FROM user_point_entries upe 
+    LEFT JOIN app_users au ON upe.app_user_id = au.id 
+    WHERE upe.user_type ILIKE '%fabricator%' 
+      AND DATE(upe.created_at) BETWEEN '2025-02-01' AND '2025-02-28' 
+    GROUP BY au.id, au.name, au.mobile 
+    ORDER BY "Total Scans" DESC;
 
 User: Can you share the total number of scans performed in each city?
 SQL:    SELECT au.city as "City", COUNT(1) as "Total Scan"

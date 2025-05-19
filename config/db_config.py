@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 # 🛠️ Fill in your local database details
 DB_HOST = "localhost"
 DB_PORT = "5432"
-DB_NAME = "postgres1"
+DB_NAME = "postgres2"
 DB_USER = "postgres"
 DB_PASSWORD = "Choyal"
 
