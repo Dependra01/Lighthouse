@@ -1,7 +1,14 @@
 # llm/deepseek_chat.py
-
 from config.ollama_config import chat_with_model
+from data.qa_bank import canonical_qa_bank
 from .examples import few_shot_examples
+import subprocess
+import json
+import re
+import math
+from functools import lru_cache
+
+LOG_PATH = "data/qa_log.json"
 # 🧠 Context we give the model (system prompt)
 SYSTEM_PROMPT = """
 You are HybridOcean AI, a data-savvy assistant that answers questions using a PostgreSQL loyalty program database.
@@ -335,14 +342,128 @@ SQL: SELECT SUM(points) AS "Total Points"
         AND DATE(upe.created_at) <= '2025-02-28';
 """
 
-def ask_llm(user_question: str) -> str:
+# --- Normalize question for matching ---
+def normalize_question(text: str) -> str:
+    text = text.strip().lower()
+    text = text.replace("’", "'")  # Convert smart apostrophe
+    text = text.replace("‘", "'")
+    text = text.replace("“", '"').replace("”", '"')
+    text = text.replace("generate only sql to answer this: ", "")
+    text = text.replace("write only sql to answer this: ", "")
+    return text.strip()
+
+
+# --- Extract SQL from model response ---
+def extract_sql_only(response: str) -> str:
+    match = re.search(r"```sql\s*(.*?)```", response, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+
+    match = re.search(r"(SELECT|WITH)\s.*", response, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(0).strip()
+
+    return response.strip()
+
+
+# --- Log non-canonical questions for feedback training ---
+def log_question_and_sql(question: str, sql: str):
+    try:
+        with open(LOG_PATH, "r", encoding="utf-8") as f:
+            logs = json.load(f)
+    except FileNotFoundError:
+        logs = []
+
+    normalized_q = normalize_question(question)
+
+    for entry in logs:
+        if normalize_question(entry["question"]) == normalized_q:
+            return  # Already logged
+        
+    logs.append({
+        "question": normalized_q,  # << fix is here
+        "sql": sql.strip()
+    })
+
+    with open(LOG_PATH, "w", encoding="utf-8") as f:
+        json.dump(logs, f, indent=2, ensure_ascii=False)
+
+
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    dot = sum(i*j for i, j in zip(a, b))
+    norm_a = math.sqrt(sum(i*i for i in a))
+    norm_b = math.sqrt(sum(j*j for j in b))
+    return dot / (norm_a * norm_b)
+
+def encode_question(question: str) -> list[float]:
+    result = subprocess.run(
+        ['python', 'embedding_model_runner.py', question],
+        capture_output=True, text=True
+    )
+    return json.loads(result.stdout)
+
+
+
+# --- Semantic matching ---
+def find_semantic_match(user_question: str, qa_bank: list, threshold: float = 0.85):
+    if not qa_bank:
+        return None
+
+    query_vector = encode_question(normalize_question(user_question))
+    best_score = 0
+    best_match = None
+
+    for qa in qa_bank:
+        bank_vector = encode_question(normalize_question(qa["question"]))
+        score = cosine_similarity(query_vector, bank_vector)
+        if score > best_score:
+            best_score = score
+            best_match = qa
+
+    if best_score >= threshold:
+        return best_match["sql"]
+    return None
+
+
+# --- Main ask_llm logic ---
+def ask_llm(user_question: str) -> dict:
+    norm_question = normalize_question(user_question)
+
+    # Step 1: Canonical match
+    for qa in canonical_qa_bank:
+        if normalize_question(qa["question"]) == norm_question:
+            return {
+                "model_reply": qa["sql"],  # No explanation available
+                "sql_used": qa["sql"]
+            }
+
+    # Step 2: Semantic match
+    semantic_match = find_semantic_match(user_question, canonical_qa_bank)
+    if semantic_match:
+        return {
+            "model_reply": semantic_match,
+            "sql_used": semantic_match
+        }
+    # Step 3: Call LLM
     try:
         response = chat_with_model(
             prompt=user_question,
-            system_prompt=SCHEMA_PRIMER + "\n\n" + SYSTEM_PROMPT + "\n\n" + FEW_SHOTS ,
+            system_prompt=SCHEMA_PRIMER + "\n\n" + SYSTEM_PROMPT + "\n\n" + FEW_SHOTS,
             temperature=0.3
         )
-        return response.strip()
-    except Exception as e:
-        return f"❌ Error from model: {e}"
 
+        model_reply = response.strip()
+        sql_used = extract_sql_only(model_reply)
+
+        log_question_and_sql(user_question, sql_used)
+
+        return {
+            "model_reply": model_reply,
+            "sql_used": sql_used
+        }
+
+    except Exception as e:
+        return {
+            "model_reply": f"❌ Error from model: {e}",
+            "sql_used": ""
+        }

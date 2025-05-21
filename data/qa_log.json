@@ -1,0 +1,46 @@
+[
+  {
+    "question": "what's the total number of scans in rajasthan?",
+    "sql": "SELECT COUNT(*) AS \"Total Scans\"\nFROM user_point_entries upe\nLEFT JOIN user_point_locations upl ON upe.id = upl.entry_id\nWHERE upl.state ILIKE '%Rajasthan%';"
+  },
+  {
+    "question": "tell me how many dealers are in each city?",
+    "sql": "SELECT \n    au.city as \"City\",\n    COUNT(*) AS \"Dealers Count\"\nFROM \n    app_users au\nWHERE \n    au.user_type LIKE '%dealer%'\n    AND au.city IS NOT NULL\nGROUP BY \n    au.city\nORDER BY \n    \"Dealers Count\" DESC;"
+  },
+  {
+    "question": "\"how many dealers do we have by city?\"",
+    "sql": "SELECT city, COUNT(*) AS dealer_count FROM app_users WHERE user_type = 'dealer' AND city IS NOT NULL GROUP BY city ORDER BY dealer_count DESC;"
+  },
+  {
+    "question": "give dealer distribution by city\"",
+    "sql": "SELECT DISTINCT \n    city AS \"City\",\n    COUNT(*) AS \"Dealer Count\"\nFROM app_users\nWHERE user_type = 'dealer'\n    AND city IS NOT NULL\nGROUP BY city\nORDER BY \"Dealer Count\" DESC;"
+  },
+  {
+    "question": "tell me what is the dealer count city-wise?",
+    "sql": "Select city AS \"City\", \n    COUNT(*) AS \"Total Dealer\"\n    FROM app_users\n    WHERE \n        user_type LIKE '%dealer%' \n        AND city IS NOT NULL\n    GROUP BY city;"
+  },
+  {
+    "question": "how many dealer i have",
+    "sql": "SELECT COUNT(*) AS \"Total Dealers\"\nFROM app_users\nWHERE user_type LIKE '%dealer%';"
+  },
+  {
+    "question": "how many total dealers in my loyalty program",
+    "sql": "SELECT COUNT(*) AS \"Total Dealers\"\nFROM app_users\nWHERE user_type LIKE '%dealer%';"
+  },
+  {
+    "question": "how many total dealer in my system",
+    "sql": "SELECT COUNT(*) AS \"Total Dealers\" \nFROM app_users \nWHERE user_type LIKE '%dealer%';"
+  },
+  {
+    "question": "how many total dealer from rajasthan in my system",
+    "sql": "SELECT COUNT(*) AS \"Dealer Count\"\nFROM app_users\nWHERE user_type LIKE '%dealer%' \n    AND state LIKE '%Rajasthan%';"
+  },
+  {
+    "question": "how many total dealer from rajasthan in my system also tell me there name and phone number , city",
+    "sql": "SELECT \n    au.name AS \"Dealer Name\",\n    au.mobile AS \"Phone Number\",\n    au.city AS \"City\"\nFROM app_users au\nWHERE \n    user_type LIKE '%dealer%' AND\n    state LIKE '%Rajasthan%';"
+  },
+  {
+    "question": "show number of dealers grouped by city",
+    "sql": "SELECT COUNT(*) AS \"Dealers in City\", city AS \"City\"\nFROM app_users\nWHERE user_type LIKE '%dealer%' AND city IS NOT NULL\nGROUP BY city;"
+  }
+]

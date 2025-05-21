@@ -3,7 +3,7 @@
 import streamlit as st
 from agents.query_agent import process_question
 
-st.set_page_config(page_title="Lighthouse AI", layout="centered")
+st.set_page_config(page_title="HybridOcean AI", layout="centered")
 
 st.title("💡 HybridOcean AI")
 st.markdown("Ask anything about your loyalty program data 👇")
