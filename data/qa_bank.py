@@ -30,7 +30,43 @@ canonical_qa_bank = [
     {
         "question": "how many total dealers in my loyalty program",
         "sql": "SELECT COUNT(*) AS \"Total Dealers\"\nFROM app_users\nWHERE user_type LIKE '%dealer%';"
-    }
+    },
 
+    {
+        "question": "How much points were redeemed in March month user-wise with name, phone, and location?",
+        "sql": """
+            SELECT 
+                au.name AS "User Name",
+                au.mobile AS "Phone Number",
+                au.city AS "City",
+                au.state AS "State",
+                SUM(urp.points) AS "Total Points Redeemed"
+            FROM 
+                user_point_redemptions urp
+            JOIN 
+                app_users au ON au.id = urp.app_user_id
+            WHERE 
+                DATE(urp.created_at) >= '2025-03-01' 
+                AND DATE(urp.created_at) <= '2025-03-31'
+                AND urp.status != '0'
+            GROUP BY 
+                au.name, au.mobile, au.city, au.state
+            ORDER BY 
+                SUM(urp.points) DESC;
+            """
+    },
+    {
+        "question": "how many new users registered in march month give me data user type wise",
+        "sql": """SELECT
+                    user_type AS "User Type",
+                    COUNT(*) AS "Total New Users"
+                FROM
+                    app_users
+                WHERE
+                    DATE(created_at) >= '2025-03-01' AND DATE(created_at) <= '2025-03-31'
+                GROUP BY
+                    user_type;
+    """
+    }
     # Add more as you validate them
 ]

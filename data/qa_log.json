@@ -42,5 +42,69 @@
   {
     "question": "show number of dealers grouped by city",
     "sql": "SELECT COUNT(*) AS \"Dealers in City\", city AS \"City\"\nFROM app_users\nWHERE user_type LIKE '%dealer%' AND city IS NOT NULL\nGROUP BY city;"
+  },
+  {
+    "question": "how i can increase my sell",
+    "sql": "SELECT product_code AS Product_Code, COUNT(1) AS Sales_Count\nFROM user_point_entries\nWHERE status = '1' AND is_reverted = FALSE\nGROUP BY product_code\nORDER BY Sales_Count DESC;"
+  },
+  {
+    "question": "how many total dealer in my loyalty program",
+    "sql": "SELECT COUNT(*) AS \"Total Dealers\"\nFROM app_users\nWHERE user_type LIKE '%dealer%';"
+  },
+  {
+    "question": "\"can you tell me how many unique user roles exist?\"",
+    "sql": "SELECT COUNT(DISTINCT user_type) AS \"Unique User Roles\"\nFROM app_users;"
+  },
+  {
+    "question": "can you tell me how many unique user roles exist?",
+    "sql": "SELECT COUNT(DISTINCT user_type) AS \"Number of Unique Roles\"\nFROM app_users;"
+  },
+  {
+    "question": "show me the total scans in each zone",
+    "sql": "SELECT upl.city AS zone, COUNT(1) AS total_scans\nFROM user_point_entries upe\nLEFT JOIN user_point_locations upl ON upe.id = upl.entry_id\nWHERE upe.status = '1' AND upe.is_reverted = FALSE\nGROUP BY city;"
+  },
+  {
+    "question": "which top  most scanned products",
+    "sql": "SELECT product_code AS \"Product Code\", COUNT(1) AS \"Count\"\nFROM user_point_entries upe\nWHERE status = '1' AND is_reverted = FALSE\nGROUP BY product_code\nORDER BY COUNT(1) DESC\nLIMIT 5;"
+  },
+  {
+    "question": "\"give me everything\"",
+    "sql": "SELECT \n    -- User Information\n    COUNT(*) AS total_users,\n    au.city AS city,\n    au.state AS state,\n    au.user_type AS user_type,\n\n    -- Product Scans\n    product_code AS top_product_code,\n    COUNT(*) AS top_product_count,\n    upl.city AS scan_city,\n    upl.district AS scan_district,\n    upl.state AS scan_state,\n\n    -- Points Redeemed\n    SUM(urp.points) AS total_points_redeemed,\n    SUM(urp.points) AS points_from_rajasthan,\n\n    -- Location-specific Scans\n    COUNT(*) AS scans_in_delhi,\n    COUNT(*) AS scans_in_rajasthan,\n\n    -- Top Product Information\n    product_code AS most_scanned_product,\n    COUNT(*) AS scan_count_for_most_scanned_product\n\nFROM \n    app_users au\nLEFT JOIN \n    user_point_entries upe ON au.id = upe.app_user_id\nLEFT JOIN \n    user_point_locations upl ON upe.id = upl.entry_id\nJOIN \n    user_point_redemptions urp ON au.id = urp.app_user_id\n\nWHERE \n    -- Include relevant filters here if needed (e.g., status, date ranges)\n    upe.status = '1' AND upe.is_reverted = FALSE\n    -- Add additional WHERE clauses as necessary\n\nGROUP BY \n    au.city,\n    au.state,\n    au.user_type,\n    upl.city,\n    upl.district,\n    upl.state\nORDER BY \n    total_users DESC,\n    top_product_count DESC,\n    points_from_rajasthan DESC;"
+  },
+  {
+    "question": "how much points redeemed in march month",
+    "sql": "SELECT \n    SUM(urp.points) AS \"Total Points\"\nFROM \n    user_point_redemptions urp\nLEFT JOIN app_users au ON au.id = urp.app_user_id\nWHERE \n    DATE(urp.created_at) >= '2025-03-01'\n    AND DATE(urp.created_at) <= '2025-03-31'\n    AND urp.status != '0';"
+  },
+  {
+    "question": "how much points redeemed in march month tell me user wise there name phone number and location",
+    "sql": "SELECT \n    au.name AS \"User Name\",\n    au.phone AS \"Phone Number\",\n    au.location AS \"Location\",\n    SUM(urp.points) AS \"Total Points Redeemed\"\nFROM \n    app_users au\nJOIN \n    user_point_redemptions urp ON au.id = urp.app_user_id\nWHERE \n    DATE(urp.created_at) = '2025-03-01' AND \n    DATE(urp.created_at) <= '2025-03-31'\n    AND urp.status != '0';"
+  },
+  {
+    "question": "top five dealers name and mobile number based on scan",
+    "sql": "SELECT \n    au.name AS Dealer_Name,\n    au.mobile AS Mobile_Number,\n    COUNT(upe.id) AS Total_Scans\nFROM \n    app_users au\nJOIN \n    user_point_entries upe ON au.id = upe.id\nWHERE \n    au.user_type LIKE '%dealer%'\nGROUP BY \n    au.id, au.name, au.mobile\nORDER BY \n    Total_Scans DESC\nLIMIT 5;"
+  },
+  {
+    "question": "top five dealers name and mobile number based on total  scan",
+    "sql": "SELECT \n    au.user_type AS dealer_name,\n    au.phone AS mobile_number,\n    COUNT(upe.id) as total_scan_count\nFROM \n    app_users au\nJOIN user_point_entriesupe ON au.id = upe.id\nWHERE \n    au.user_type LIKE '%dealer%'\n    AND upe.status = '1'\n    AND upe.is_reverted = false\nGROUP BY \n    au.id, au.user_type\nORDER BY \n    total_scan_count DESC\nLIMIT 5;"
+  },
+  {
+    "question": "how you will improve your model",
+    "sql": "SELECT \n    DATE(created_at) AS \"Date\",\n    COUNT(*) AS \"Total Users\",\n    ROUND((COUNT(*) * (conversion_rate / average_conversion_rate)) , 2) AS \"Potential Conversions\"\nFROM \n    app_users\nWHERE \n    DATE(created_at) BETWEEN '2025-01-01' AND '2025-12-31'\nGROUP BY \n    DATE(created_at)\nHAVING \n    Avg(conversion_rate) > 0.1\nORDER BY \n    Date DESC;"
+  },
+  {
+    "question": "how many new users registered in march month give me data user type wise",
+    "sql": "SELECT \n    user_type AS \"User Type\",\n    COUNT(id) AS \"New Users Count\"\nFROM \n    app_users\nWHERE \n    DATE(created_at) = '2025-03'\nGROUP BY \n    user_type;"
+  },
+  {
+    "question": "how many new users registered in march month give me data user type details",
+    "sql": "SELECT \n    COUNT(DISTINCT user_type) AS \"Total Users\",\n    CASE \n        WHEN user_type LIKE '%dealer%' THEN 'Dealer'\n        WHEN user_type LIKE '%carpenter%' THEN 'Carpenter'\n        WHEN user_type LIKE '%electrician%' THEN 'Electrician'\n        ELSE 'Other'\n    END AS \"User Type\"\nFROM \n    app_users\nWHERE \n    DATE(created_at) >= '2025-03-01' \n    AND DATE(created_at) <= '2025-03-31';"
+  },
+  {
+    "question": "how many new users comes in last 6 months",
+    "sql": "SELECT \n    TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,\n    COUNT(*) AS \"user count\"\nFROM app_users\nWHERE created_at >= CURRENT_DATE - INTERVAL '6 months'\nGROUP BY month\nORDER BY month;"
+  },
+  {
+    "question": "tell me all dealers details",
+    "sql": "SELECT name, phone, email, city, state, user_type \nFROM app_users \nWHERE user_type LIKE '%dealer%';"
   }
 ]

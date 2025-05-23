@@ -2,11 +2,12 @@
 from config.ollama_config import chat_with_model
 from data.qa_bank import canonical_qa_bank
 from .examples import few_shot_examples
+from rag.semantic_retriever import retrieve_similar_question
+from utils.text_utils import normalize_question
 import subprocess
 import json
 import re
 import math
-from functools import lru_cache
 
 LOG_PATH = "data/qa_log.json"
 # 🧠 Context we give the model (system prompt)
@@ -90,149 +91,228 @@ The updated_at timestamp shows when the points balance was last modified.
 Answer clearly, provide SQL if useful, and avoid hallucinating.
 """
 SCHEMA_PRIMER = """
-You are Lighthouse AI, an expert SQL analyst for a loyalty program company.
+You are HybridOcean AI, an expert SQL analyst for a loyalty program company. You help users explore insights about QR scans, point earnings, redemptions, and user activity.
 
-You work with the following PostgreSQL database schema:
-Core Tables:
+Use the following PostgreSQL schema and business rules to answer questions accurately. Use SQL with correct table references, relationships, filters, and column meanings. Avoid hallucinations.
+
+---
 
 1. app_user_type
-- Describes user roles and business rules
-- Columns:
-  - user_type_id (PK): Unique ID (e.g., 5 = Dealer, 6 = Carpenter)
-  - user_type: Role key (e.g., 'dealer', 'carpenter')
-  - name: Human-readable name
-  - cash_per_point: ₹ value per point (e.g., 0.4 for dealers)
-  - min_point_redeem: Minimum points to redeem
-  - min_cash_redeem: Minimum ₹ to redeem
-  - registration_bonus: Points awarded at signup
-  - max_transaction_per_day: Daily scan count limit
-  - max_amount_per_day: Daily transaction ₹ limit
-  - max_amount_per_transaction: Per-tx ₹ cap
+
+Purpose:
+Defines different types of users in the loyalty program (e.g., dealers, carpenters, fabricators) and the specific rules and limitations that apply to each role.
+
+Key Columns:
+- user_type_id (PK): Unique ID (e.g., 5 = Dealer, 6 = Carpenter)
+- user_type: Role key used for filtering (e.g., 'dealer', 'carpenter')
+- name: Human-readable name
+- cash_per_point: ₹ value per point (e.g., 0.4 for dealers)
+- min_point_redeem: Minimum points required for redemption
+- min_cash_redeem: Minimum cash amount allowed for redemption
+- registration_bonus: Points awarded when user first scans
+- max_transaction_per_day: Max scan events per day
+- max_amount_per_day: Max value transacted per day (₹)
+- max_amount_per_transaction: Max amount allowed per scan
 
 Business Rules:
-- Dealers: high scan limit, low point value (₹0.4)
-- Carpenters: low scan limit (20/day), high daily ₹ (₹2cr)
-- Fabricators: need 1500 pts to redeem
-- Bonus: `registration_bonus` applied if `is_scanned = TRUE` in app_users
-- Always use ILIKE for text comparisons to handle case-insensitivity and partial matches.
-- For user_type, state, district, and city — never assume exact spelling or casing. Use ILIKE with wildcards (e.g., ILIKE '%carpenter%').
+- Dealers have high scan limits but lower point value.
+- Carpenters are limited to 20 scans/day but can earn up to ₹2 crore/day.
+- Fabricators must earn 1500+ points to redeem anything.
+- When a user signs up and `is_scanned = TRUE`, apply `registration_bonus`.
+- Always use `ILIKE` for comparisons (user_type, state, city, district).
 
 ---
 
 2. app_users
-- Main user table
-- Columns:
-  - id (PK): Internal user ID
-  - user_id: Business-facing ID (e.g., 'carpenter_228918')
-  - name: User full name
-  - mobile: Contact number
-  - user_type_id: FK → app_user_type.user_type_id
-  - state / district / city: Geolocation
-  - pincode: 6-digit code
-  - is_scanned: TRUE if scanned and got signup bonus
+
+Purpose:
+Stores user profiles, including identity, contact info, registration metadata, and location.
+
+Key Columns:
+- id (PK): Internal ID of the user (used for joins)
+- user_id: App login ID (e.g., 'carpenter_228918') — do not use in analytics
+- name: User’s name
+- mobile: The only valid column for phone number. Use this for contact info. DO NOT guess `phone`.
+- city / district / state: Use these for location fields. There is NO column named `location`.
+- user_type_id: FK → app_user_type.user_type_id
+- state / district / city / pincode: User location (must use `ILIKE`)
+- is_scanned: TRUE if user has completed first scan (applies registration_bonus)
+- created_at: Timestamp of registration
+- login_time: Timestamp of last app login
+
+Column Notes:
+- au.mobile = phone number
+- Location = from au.city, au.state, au.district
+- No phone or location columns exist
+- `user_id` is used only for login. Use `id` for all joins.
+- All location filters must use `ILIKE` to handle case mismatches.
+- Ignore unused fields like `gender`, `zone_id`, `zone_name`.
 
 ---
 
 3. district
-- Maps districts to states
-- Columns:
-  - id (PK): Unique district ID
-  - state_id: FK → state.id
-  - district: Official district name
+
+Purpose:
+Defines the list of valid districts in India and links them to states.
+
+Key Columns:
+- id (PK): Unique district ID
+- state_id: FK → state.id
+- district: District name
+
+Use this table for:
+- Validating location data in `app_users` or reports
 
 ---
 
 4. state
-- All Indian states
-- Columns:
-  - id (PK): Unique state ID
-  - country_id: Always 1 (India)
-  - state: Official state name
+
+Purpose:
+Stores all Indian states. Every record assumes country_id = 1 (India only).
+
+Key Columns:
+- id (PK): State ID
+- country_id: Always 1 (fixed)
+- state: State name
+
+Use for:
+- Joining with `district` via `state_id`
 
 ---
 
 5. user_point_entries
-- All point transactions
-- Columns:
-  - id (PK): Entry ID
-  - app_user_id: FK → app_users.id
-  - user_type_id: FK → app_user_type.user_type_id
-  - points: +ve = earned, -ve = deducted
-  - created_at: Timestamp with timezone
-  - product_code / product_name: What was scanned
+
+Purpose:
+Tracks every QR code scan and the points earned or deducted. This is the core event log for all scan activities.
+
+Key Columns:
+- id (PK): Unique entry ID (1 per scan)
+- app_user_id: FK → app_users.id (who scanned)
+- user_type_id: FK → app_user_type.user_type_id (role at scan time)
+- product_code, product_name: What was scanned
+- points: +ve = earned, -ve = deducted (e.g., for fraud)
+- created_at: Exact time of scan
+- is_reverted: FALSE = valid scan, TRUE = invalid (don't count it)
 
 Business Rules:
-- Deductions must not exceed available balance
-- Earned points are capped by user role
+- Use `points > 0` for total earned points.
+- Use `is_reverted = FALSE` to include only valid scans.
+- Scans where `points < 0` are redemptions or penalties.
+
+Use for:
+- Total scan counts
+- Points earned per product, date, user type, or location
+- Scan trends over time
 
 ---
 
 6. user_point_locations
-- Scan locations (1:1 with user_point_entries)
-- Columns:
-  - entry_id (FK): → user_point_entries.id
-  - city / district / state: Scan location
-  - pincode: 6-digit serviceable area
-  - known_name: Free-text landmark
-  - created_at: Scan timestamp
 
-- Geographic Rules:
-  - The table 'app_users' has columns: `city`, `district`, `state`.
-  - The table `user_point_locations` has columns: `city`, `district`, `state`.
-  - City and district are smaller regions inside a state.
-  - If the user asks about a **state** (like "Rajasthan", "Uttar Pradesh"), filter using `upl.state`.
-  - If the user asks about a **city** (like "Delhi", "Lucknow"), filter using `upl.city`.
-  - If unsure, prefer `upl.state` for broad regions, and `upl.city` for local areas.
+Purpose:
+Stores the physical location of each QR scan. 1:1 linked with user_point_entries.
+
+Key Columns:
+- entry_id: FK → user_point_entries.id
+- city, district, state: Location of scan (must use `ILIKE`)
+- pincode: Valid postal code
+- known_name: Optional landmark
+- created_at: Time of scan
+
+Geographic Rules:
+- Always join with this table if user asks about **where scans happened**.
+- If user mentions a **state**, use `upl.state ILIKE '%xyz%'`.
+- If user mentions a **city**, use `upl.city ILIKE '%xyz%'`.
 
 ---
 
 7. user_points
-- Point Audit (1 row per user)
-- Columns:
-  - app_user_id (PK): FK → app_users.id
-  - point_earned = lifetime point earning / point_redeemed = point redeemed / point_balance
-  - point_reserved / point_expired
-  - cash_redeemed: ₹ redeemed
-  - created_at / updated_at: Audit timestamps
 
-8. user_point_redemptions Table:
+Purpose:
+Maintains real-time loyalty point balances for each user.
 
-    Records each instance of point redemption by users.
+Key Columns:
+- app_user_id (PK): FK → app_users.id
+- point_earned: Total lifetime points earned (from valid QR scans)
+- point_redeemed: Total redeemed by the user
+- point_balance: Available points = earned - redeemed - expired - reserved
+- point_reserved: Points held for pending redemptions
+- point_expired: Points lost due to expiry
+- created_at, updated_at: Last audit timestamps
 
-    user_type_id and user_type indicate the user's role.
-
-    app_user_id links to the user's details in the app_users table.
-
-    points denotes the number of points redeemed.
-
-    balance shows the user's point balance after redemption.
-
-   - redemption_type specifies the redemption category:
-
-          1 = Gift
-
-          2 = Cash
-
-          3 = Coupon
-
-          4 = Dream Gift
-
-    status indicates approval status (0 = not approved).
-
-    created_at and updated_at record the timestamps of the redemption event.
-
-
-
+Use this table when the user asks:
+- “How many points does X have?”
+- “What’s the available balance?”
 
 ---
+
+8. user_point_redemptions
+
+Purpose:
+Stores each time a user redeems their loyalty points for rewards.
+
+Key Columns:
+- id: Redemption ID
+- app_user_id: FK → app_users.id
+- user_type_id / user_type: Type of user redeeming
+- points: Points redeemed in that transaction
+- balance: Balance after redeeming
+- redemption_type: 1 = Gift, 2 = Cash, 3 = Coupon, 4 = Dream Gift
+- status: 0 = Not approved, 1 = Approved
+- created_at / updated_at: When redemption was submitted and processed
+
+Business Rules:
+- Use `status != '0'` to include only successful redemptions.
+- Use this table for:
+  - “How many points were redeemed?”
+  - “Redemptions by city/state/user_type?”
+  - “Redemption trend by month”
+
+---
+
 Relationships Summary:
 - app_users.user_type_id → app_user_type.user_type_id
 - user_point_entries.app_user_id → app_users.id
 - user_point_locations.entry_id → user_point_entries.id
 - user_points.app_user_id → app_users.id
+- user_point_redemptions.app_user_id → app_users.id
 - district.state_id → state.id
 
+---
+
+Intent-to-Table Mapping:
+
+| Intent                        | Use Table                 | Notes |
+|------------------------------|---------------------------|-------|
+| Total scans                  | user_point_entries        | `is_reverted = FALSE` |
+| Total points earned          | user_point_entries        | `points > 0 AND is_reverted = FALSE` |
+| Total points redeemed        | user_point_redemptions    | `status != '0'` |
+| Available balance            | user_points               | `point_balance` |
+| Redemption trend             | user_point_redemptions    | Use `created_at` |
+| Registration trend           | app_users                 | Use `created_at` |
+| Active users                 | app_users                 | Use `login_time IS NOT NULL` |
+| Location-wise scan report    | user_point_locations JOIN user_point_entries | Match by `entry_id` |
+
+---
+
+Guidelines for SQL Generation:
+- Always use `ILIKE` for user_type, state, city, and district.
+- For redemptions, include only `status != '0'` unless user asks for pending.
+- Use `created_at` for all time-based reporting.
+- When unsure which table to use, prioritize:
+    - Points? → `user_point_entries`
+    - Balances? → `user_points`
+    - Redemptions? → `user_point_redemptions`
+    - Registrations? → `app_users`
+
+
+Common Mistakes to Avoid:
+- Do NOT use `phone` — the correct field is `mobile`
+- Do NOT use `location` — use `city`, `district`, and `state`
+- If summing or grouping, ALWAYS add a GROUP BY clause
+
+
 """
+
 
 FEW_SHOTS = """
 User: How many distinct user types do we have in the system?
@@ -340,17 +420,27 @@ SQL: SELECT SUM(points) AS "Total Points"
       WHERE status = '1' AND is_reverted = FALSE 
         AND DATE(upe.created_at) >= '2025-02-15'
         AND DATE(upe.created_at) <= '2025-02-28';
-"""
 
-# --- Normalize question for matching ---
-def normalize_question(text: str) -> str:
-    text = text.strip().lower()
-    text = text.replace("’", "'")  # Convert smart apostrophe
-    text = text.replace("‘", "'")
-    text = text.replace("“", '"').replace("”", '"')
-    text = text.replace("generate only sql to answer this: ", "")
-    text = text.replace("write only sql to answer this: ", "")
-    return text.strip()
+User: How much points were redeemed in March month user-wise with name, phone, and location?
+SQL:  SELECT 
+        au.name AS "User Name",
+        au.mobile AS "Phone Number",
+        au.city AS "City",
+        au.state AS "State",
+        SUM(urp.points) AS "Total Points Redeemed"
+        FROM 
+            user_point_redemptions urp
+        JOIN 
+            app_users au ON au.id = urp.app_user_id
+        WHERE 
+            DATE(urp.created_at) >= '2025-03-01' 
+            AND DATE(urp.created_at) <= '2025-03-31'
+            AND urp.status != '0'
+        GROUP BY 
+            au.name, au.mobile, au.city, au.state
+        ORDER BY 
+             SUM(urp.points) DESC;
+"""
 
 
 # --- Extract SQL from model response ---
@@ -389,40 +479,40 @@ def log_question_and_sql(question: str, sql: str):
         json.dump(logs, f, indent=2, ensure_ascii=False)
 
 
-def cosine_similarity(a: list[float], b: list[float]) -> float:
-    dot = sum(i*j for i, j in zip(a, b))
-    norm_a = math.sqrt(sum(i*i for i in a))
-    norm_b = math.sqrt(sum(j*j for j in b))
-    return dot / (norm_a * norm_b)
+# def cosine_similarity(a: list[float], b: list[float]) -> float:
+#     dot = sum(i*j for i, j in zip(a, b))
+#     norm_a = math.sqrt(sum(i*i for i in a))
+#     norm_b = math.sqrt(sum(j*j for j in b))
+#     return dot / (norm_a * norm_b)
 
-def encode_question(question: str) -> list[float]:
-    result = subprocess.run(
-        ['python', 'embedding_model_runner.py', question],
-        capture_output=True, text=True
-    )
-    return json.loads(result.stdout)
+# def encode_question(question: str) -> list[float]:
+#     result = subprocess.run(
+#         ['python', 'embedding_model_runner.py', question],
+#         capture_output=True, text=True
+#     )
+#     return json.loads(result.stdout)
 
 
 
-# --- Semantic matching ---
-def find_semantic_match(user_question: str, qa_bank: list, threshold: float = 0.85):
-    if not qa_bank:
-        return None
+# # --- Semantic matching ---
+# def find_semantic_match(user_question: str, qa_bank: list, threshold: float = 0.85):
+#     if not qa_bank:
+#         return None
 
-    query_vector = encode_question(normalize_question(user_question))
-    best_score = 0
-    best_match = None
+#     query_vector = encode_question(normalize_question(user_question))
+#     best_score = 0
+#     best_match = None
 
-    for qa in qa_bank:
-        bank_vector = encode_question(normalize_question(qa["question"]))
-        score = cosine_similarity(query_vector, bank_vector)
-        if score > best_score:
-            best_score = score
-            best_match = qa
+#     for qa in qa_bank:
+#         bank_vector = encode_question(normalize_question(qa["question"]))
+#         score = cosine_similarity(query_vector, bank_vector)
+#         if score > best_score:
+#             best_score = score
+#             best_match = qa
 
-    if best_score >= threshold:
-        return best_match["sql"]
-    return None
+#     if best_score >= threshold:
+#         return best_match["sql"]
+#     return None
 
 
 # --- Main ask_llm logic ---
@@ -438,7 +528,8 @@ def ask_llm(user_question: str) -> dict:
             }
 
     # Step 2: Semantic match
-    semantic_match = find_semantic_match(user_question, canonical_qa_bank)
+    # semantic_match = find_semantic_match(user_question, canonical_qa_bank)   " cosin similarity"
+    semantic_match = retrieve_similar_question(user_question)
     if semantic_match:
         return {
             "model_reply": semantic_match,
