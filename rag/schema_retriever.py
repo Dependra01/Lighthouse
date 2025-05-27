@@ -1,43 +1,47 @@
 # rag/schema_retriever.py
 
+import os
 import json
 import faiss
-import os
-from sentence_transformers import SentenceTransformer
 import numpy as np
+import subprocess
 
 SCHEMA_JSON_PATH = "data/schema_chunks.json"
-VECTOR_STORE_PATH = "data/schema_vector_store.faiss"
-CHUNK_LABELS_PATH = "data/schema_labels.json"
+SCHEMA_INDEX_PATH = "data/schema_vector_store.faiss"
+SCHEMA_LABELS_PATH = "data/schema_labels.json"
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+# Reuse embedding subprocess safely
+def encode_text(text):
+    result = subprocess.run(
+        ['python', 'embedding_model_runner.py', text],
+        capture_output=True, text=True
+    )
+    return np.array(json.loads(result.stdout))
 
 def build_schema_vector_store():
     with open(SCHEMA_JSON_PATH, "r") as f:
         chunks = json.load(f)
-    
+
     texts = [chunk["content"] for chunk in chunks]
     labels = [chunk["label"] for chunk in chunks]
-    embeddings = model.encode(texts, convert_to_numpy=True)
+    embeddings = np.array([encode_text(text) for text in texts])
 
     index = faiss.IndexFlatL2(embeddings.shape[1])
     index.add(embeddings)
-    faiss.write_index(index, VECTOR_STORE_PATH)
+    faiss.write_index(index, SCHEMA_INDEX_PATH)
 
-    with open(CHUNK_LABELS_PATH, "w") as f:
+    with open(SCHEMA_LABELS_PATH, "w") as f:
         json.dump(labels, f)
 
 def retrieve_schema_chunks(query: str, top_k: int = 3):
-    if not os.path.exists(VECTOR_STORE_PATH):
+    if not os.path.exists(SCHEMA_INDEX_PATH):
         build_schema_vector_store()
 
-    index = faiss.read_index(VECTOR_STORE_PATH)
-    with open(CHUNK_LABELS_PATH, "r") as f:
-        labels = json.load(f)
     with open(SCHEMA_JSON_PATH, "r") as f:
         chunks = json.load(f)
 
-    query_embedding = model.encode([query], convert_to_numpy=True)
-    distances, indices = index.search(query_embedding, top_k)
+    index = faiss.read_index(SCHEMA_INDEX_PATH)
+    query_vec = encode_text(query).reshape(1, -1)
+    distances, indices = index.search(query_vec, k=top_k)
 
     return [chunks[i]["content"] for i in indices[0]]

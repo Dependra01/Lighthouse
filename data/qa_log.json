@@ -226,5 +226,9 @@
   {
     "question": "total point redeemed and earned point by user whose phone number 9096036658",
     "sql": "SELECT SUM(`points`) AS total_redeeming_points\nFROM `user_point_redemptions`\nWHERE `user_id` = (SELECT `id` FROM `app_users` WHERE `mobile` = '9096036658')\nAND `status` != '0';"
+  },
+  {
+    "question": "who are you",
+    "sql": "SELECT \n    au.name AS \"User Name\",\n    au.mobile AS \"Phone Number\",\n    au.city AS \"City\",\n    au.state AS \"State\",\n    SUM(urp.points) AS \"Total Points Redeemed\"\nFROM \n    user_point_redemptions urp\nJOIN \n    app_users au ON urp.app_user_id = au.id\nWHERE \n    DATE(urp.created_at) >= '2025-03-01' \n    AND DATE(urp.created_at) <= '2025-03-31'\n    AND urp.status != '0'\nGROUP BY \n    au.name, au.mobile, au.city, au.state\nORDER BY \n    \"Total Points Redeemed\" DESC;"
   }
 ]
