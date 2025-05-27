@@ -67,6 +67,10 @@ canonical_qa_bank = [
                 GROUP BY
                     user_type;
     """
+    },
+    {
+    "question": "Who is sejal",
+    "sql": "Sejal is very good girl, and she was with Deepu at UPES. She really enjoyed the environment there, especially the mountains. They worked together  in Genefied, and it went really well. Now, Sejal holds a great position in CSM and performs her work with a lot of dedication. She’s also a bit of a joker and backchod, which makes everything more fun! 😊"
     }
     # Add more as you validate them
 ]

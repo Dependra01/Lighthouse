@@ -1,0 +1,76 @@
+[
+  {
+    "label": "app_user_type schema",
+    "content": "The app_user_type table defines user roles and business rules. Columns include: user_type_id (primary key), user_type (e.g., 'dealer', 'carpenter', etc.), name, cash_per_point, min_point_redeem, min_cash_redeem, registration_bonus, max_transaction_per_day, max_amount_per_day, max_amount_per_transaction."
+  },
+  {
+    "label": "app_user_type business logic",
+    "content": "Dealers get ₹0.4 per point. Carpenters have a 20 scans/day limit but high cash flow cap (₹2 crore/day). Fabricators need 1500+ points to redeem. Use user_type ILIKE for role filters."
+  },
+  {
+    "label": "app_users schema",
+    "content": "The app_users table stores core user profiles. Columns include: id (primary key), user_id (login ID, not used for analytics), name, mobile, email, whatsapp_number, dob, user_type_id, user_type, state, district, city, pincode, address1, address2, is_scanned (TRUE if signup complete), login_time, created_at. Gender and zone fields are irrelevant."
+  },
+  {
+    "label": "app_users notes",
+    "content": "For geographic filtering, use state, district, city via ILIKE. Never use user_id for joins. Use mobile for phone. There is no column called 'username' or 'location'."
+  },
+  {
+    "label": "user_point_entries schema",
+    "content": "user_point_entries tracks each QR scan. Columns include: id (scan ID), app_user_id (FK to app_users), user_type_id, points (+ for earned, - for deduction), product_id, product_code, product_name, created_at (timestamp of scan), is_reverted (TRUE = invalid scan)."
+  },
+  {
+    "label": "user_point_entries logic",
+    "content": "Use only rows where is_reverted = FALSE. Use points > 0 for valid earnings. To count scans, group by created_at or product_code. Never use entry_id — that belongs to user_point_locations."
+  },
+  {
+    "label": "user_point_locations logic",
+    "content": "Only this table has entry_id. For scan geography, join with user_point_entries using upl.entry_id = upe.id. Use ILIKE for filtering city/state/district."
+  },
+  {
+    "label": "user_points schema",
+    "content": "user_points is the real-time ledger of each user's point status. Columns: app_user_id (FK to app_users.id), point_earned, point_redeemed, point_balance, point_reserved, point_expired, cash_redeemed, created_at, updated_at."
+  },
+  {
+    "label": "user_points logic",
+    "content": "To get balance: point_balance = point_earned - point_redeemed - point_expired - point_reserved. Use point_balance for 'how many points does user have?'."
+  },
+  {
+    "label": "user_point_redemptions schema",
+    "content": "user_point_redemptions logs each time points are redeemed. Columns: id, app_user_id (FK to app_users), user_type_id, user_type, points, balance (after redemption), redemption_type (1=Gift, 2=Cash, 3=Coupon, 4=Dream Gift), status (0=unapproved), created_at, updated_at."
+  },
+  {
+    "label": "user_point_redemptions logic",
+    "content": "Always check status != '0' to filter valid redemptions. Use redemption_type to segment redemption types. Sum(points) for total redeemed."
+  },
+  {
+    "label": "state schema",
+    "content": "The state table defines Indian states. Columns: id (PK), state (name), country_id (always 1 for India). Used for geographic validation."
+  },
+  {
+    "label": "district schema",
+    "content": "The district table defines districts and links to state via state_id. Columns: id (PK), state_id (FK to state.id), district (name). Used for location hierarchies."
+  },
+  {
+    "label": "valid user types",
+    "content": "Valid values for user_type are: dealer, carpenter, contractor, fabricator, sales. These are the only roles allowed. Do NOT guess electrician, plumber, etc."
+  },
+  {
+    "label": "join rules",
+    "content": "To join user_point_entries and app_users, use upe.app_user_id = au.id. Do NOT use upe.id = au.id — that is incorrect. For location, join user_point_locations.entry_id = user_point_entries.id."
+  },
+  {
+    "label": "registration analysis logic",
+    "content": "To count registrations by month, use TO_CHAR(created_at, 'YYYY-MM') on app_users.created_at. Always use ILIKE for filtering city/state/user_type."
+  },
+  {
+  "label": "ambiguous user_type fix",
+  "content": "The column user_type exists in multiple tables like app_users and user_point_entries. Always prefix it with the correct alias (e.g., au.user_type or upe.user_type) to avoid ambiguity in SQL."
+  },
+  {
+  "label": "app_users - phone number column",
+  "content": "There is NO column named 'phone' or 'phone_number'. The correct field for user contact is 'mobile'. Always use 'mobile' when showing or filtering phone numbers in app_users."
+  }
+
+
+]

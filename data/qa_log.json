@@ -106,5 +106,125 @@
   {
     "question": "tell me all dealers details",
     "sql": "SELECT name, phone, email, city, state, user_type \nFROM app_users \nWHERE user_type LIKE '%dealer%';"
+  },
+  {
+    "question": "give all users details",
+    "sql": "SELECT * FROM app_users AS u;"
+  },
+  {
+    "question": "give total points of retailers from rajasthan gujarat and delhi",
+    "sql": "SELECT \n    SUM(upe.points) AS total_points_rajasthan,\n    SUM(upe.points) AS total_points_gujarat,\n    SUM(upe.points) AS total_points_delhi\nFROM \n    user_point_entries upe\nLEFT JOIN app_users au ON upe.id = au.id\nWHERE \n    au.state LIKE '%Rajasthan%'\nGROUP BY \n    au.id\nUNION\nSELECT \n    SUM(upe.points) AS total_points_rajasthan,\n    SUM(upe.points) AS total_points_gujarat,\n    SUM(upe.points) AS total_points_delhi\nFROM \n    user_point_entries upe\nLEFT JOIN app_users au ON upe.id = au.id\nWHERE \n    au.state LIKE '%Gujarat%'\nGROUP BY \n    au.id\nUNION\nSELECT \n    SUM(upe.points) AS total_points_rajasthan,\n    SUM(upe.points) AS total_points_gujarat,\n    SUM(upe.points) AS total_points_delhi\nFROM \n    user_point_entries upe\nLEFT JOIN app_users au ON upe.id = au.id\nWHERE \n    au.state LIKE '%Delhi%'\nGROUP BY \n    au.id;"
+  },
+  {
+    "question": "give me comparison of five top retailers of gujarat and delhi",
+    "sql": "-- Query to get top 5 retailers in Gujarat\nWITH top_gujarat AS (\n    SELECT \n        r.retailer_id,\n        r.name,\n        SUM(s.total_sales) AS total_sales_guj\n    FROM \n        retailers r\n    JOIN \n        sales s ON r.retailer_id = s.retailer_id\n    WHERE \n        location = 'Gujarat'\n    GROUP BY \n        r.name, r.retailer_id\n    ORDER BY \n        total_sales_guj DESC\n    LIMIT 5\n)\nSELECT \n    name AS \"Gujarat Retailer\",\n    total_sales_guj AS \"Total Sales (Guj)\"\nFROM \n    top_gujarat\nORDER BY \n    total_sales_guj DESC\nLIMIT 5;\n\n-- Query to get top 5 retailers in Delhi\nWITH top_delhi AS (\n    SELECT \n        r.retailer_id,\n        r.name,\n        SUM(s.total_sales) AS total_sales_del\n    FROM \n        retailers r\n    JOIN \n        sales s ON r.retailer_id = s.retailer_id\n    WHERE \n        location = 'Delhi'\n    GROUP BY \n        r.name, r.retailer_id\n    ORDER BY \n        total_sales_del DESC\n    LIMIT 5\n)\nSELECT \n    name AS \"Delhi Retailer\",\n    total_sales_del AS \"Total Sales (Del)\"\nFROM \n    top_delhi\nORDER BY \n    total_sales_del DESC\nLIMIT 5;\n\n-- Query to compare the performance of top 5 retailers in both regions\nWITH gujarat_data AS (\n    SELECT \n        name,\n        total_sales_guj\n    FROM \n        top_gujarat\n), delhi_data AS (\n    SELECT \n        name,\n        total_sales_del\n    FROM \n        top_delhi)\nSELECT \n    gd.name AS \"Retailer Name\",\n    gd.total_sales_guj AS \"Sales in Gujarat\",\n    dd.name AS \"Retailer Name\",\n    dd.total_sales_del AS \"Sales in Delhi\",\n    (gd.total_sales_guj - dd.total_sales_del) AS \"Sales Difference\"\nFROM \n    gujarat_data gd\nJOIN \n    delhi_data dd ON gd.name = dd.name\nORDER BY \n    gd.total_sales_guj DESC, dd.total_sales_del DESC\nLIMIT 5;"
+  },
+  {
+    "question": "give me  five top retailers of gujarat and delhi",
+    "sql": "WITH gujarat_retailers AS (\n    SELECT \n        r.retailer_id,\n        r.name,\n        SUM(rs.totalSales) AS total_sales\n    FROM \n        retailers r\n    JOIN \n        retail_sales rs ON r.retailer_id = rs.retailer_id\n    WHERE\n        r.state = 'Gujarat'\n    GROUP BY\n        r.retailer_id, r.name\n)\n\nSELECT \n    name,\n    total_sales\nFROM \n    gujarat_retailers\nORDER BY\n    total_sales DESC\nLIMIT 5;"
+  },
+  {
+    "question": "give me  five top carpenters of gujarat and delhi",
+    "sql": "SELECT \n    au.name AS \"Carpenter Name\",\n    COUNT(au.id) as \"Entry Count\"\nFROM \n    app_users au\nWHERE \n    user_type LIKE '%carpenter%' \n    AND state ILIKE '%Gujarat%'\nGROUP BY \n    au.name\nORDER BY \n    Entry Count DESC\nLIMIT 5;"
+  },
+  {
+    "question": "tell me how many new users registered in march month give me data user type wise",
+    "sql": "SELECT \n    (CASE \n        WHEN user_type = 'Dealer' THEN 'Dealer'\n        WHEN user_type = 'Carpenter' THEN 'Carpenter'\n        -- Add more user types as needed\n        ELSE 'Other'\n    ) AS \"User Type\",\n    COUNT(*) AS \"New Users\"\nFROM \n    app_users\nWHERE \n    DATE(created_at) BETWEEN '2025-03-01' AND '2025-03-31';\nGROUP BY \n    CASE \n        WHEN user_type = 'Dealer' OR user_type = 'Carpenter' \n            -- Add more conditions as needed for other user types\n        ELSE 'Other'\n    END;"
+  },
+  {
+    "question": "jjjjjkh",
+    "sql": "SELECT \n    SUM(points) AS \"Total Points Earned\"\nFROM \n    user_point_entries upe \nWHERE \n    status = '1' \n    AND is_reverted = FALSE \n    AND DATE(upe.created_at) >= '2025-02-15'\n    AND DATE(upe.created_at) <= '2025-02-28';"
+  },
+  {
+    "question": "jjjjjkh\nvrffccxdxdxds",
+    "sql": "SELECT \n    au.name AS \"User Name\",\n    au.mobile AS \"Phone Number\",\n    au.city AS \"City\",\n    au.state AS \"State\",\n    SUM(urp.points) AS \"Total Points Redeemed\"\nFROM \n    user_point_redemptions urp\nJOIN \n    app_users au ON au.id = urp.app_user_id\nWHERE \n    DATE(urp.created_at) >= '2025-03-01'\n    AND DATE(urp.created_at) <= '2025-03-31'\n    AND urp.status != '0'\nGROUP BY \n    au.name, au.mobile, au.city, au.state\nORDER BY \n    SUM(urp.points) DESC;"
+  },
+  {
+    "question": "tell me about my program",
+    "sql": "SELECT COUNT(*) AS \"New Users\" \n   FROM app_users \n   WHERE DATE(created_at) >= '2025-02-01' AND DATE(created_at) <= '2025-02-28';"
+  },
+  {
+    "question": "tell me about how is going inside my loyalty program",
+    "sql": "SELECT \n    'Total Users' AS metric1,\n    (SELECT COUNT(*) FROM app_users) AS value1,\n    \n    'Average Points Earned Per User' AS metric2,\n    (SELECT AVG(points) FROM user_point_entries WHERE status = '1' AND is_reverted = FALSE) / (SELECT COUNT(*) FROM app_users) AS value2,\n    \n    'Redemption Rate' AS metric3,\n    (SELECT COUNT(*) FROM user_point_redemptions WHERE status != '0') / (SELECT COUNT(*) FROM app_users) AS value3,\n    \n    'Total Revenue Generated Through Loyalty Program' AS metric4,\n    (SELECT SUM(points * product_price) FROM user_point_entries WHERE status = '1' AND is_reverted = FALSE) AS value4,\n    \n    'Popular Products - Top 5' AS metric5,\n    (SELECT TOP 5 product_code, COUNT(*) as cnt, \n     (COUNT(*) / (SELECT COUNT(*) FROM user_point_entries WHERE status = '1' AND is_reverted = FALSE)) * 100 as pct\n     FROM user_point_entries\n     WHERE status = '1' AND is_reverted = FALSE\n     GROUP BY product_code\n     ORDER BY cnt DESC) AS value5,\n    \n    'Top 10% Users by Points Earned' AS metric6,\n    (SELECT TOP 10% OF app_users BY points DESC) AS value6,\n    \n    'Geographical Distribution' AS metric7,\n    (SELECT COUNT(*) FROM app_users WHERE country LIKE '%India%' OR state LIKE '%Rajasthan%') AS value7,\n    \n    'Total Points Redeemed' AS metric8,\n    (SELECT SUM(points) FROM user_point_redemptions WHERE status != '0') AS value8,\n    \n    'Redemption Locations - Top 10' AS metric9,\n    (SELECT TOP 10 location, COUNT(*) as cnt\n     FROM user_point_locations\n     WHERE entry_id IN (SELECT id FROM user_point_entries WHERE status = '1' AND is_reverted = FALSE)\n     GROUP BY location\n     ORDER BY cnt DESC) AS value9\nFROM multiple_cTEs;"
+  },
+  {
+    "question": "tell me how many new users registered in last 3 month give me data user type wise",
+    "sql": "SELECT\n    user_type,\n    COUNT(*) as \"new_users_count\"\nFROM\n    app_users\nWHERE\n    DATE(created_at) >= CURRENT_DATE - INTERVAL '3 months'\n    AND DATE(created_at) <= CURRENT_DATE\nGROUP BY\n    user_type;"
+  },
+  {
+    "question": "tell me how many new users registered in last 3 month give me data user type wise and month wise",
+    "sql": "SELECT \n    TO_CHAR(date_trunc(created_at, 'year-month'), 'YYYY-MM') AS month,\n    user_type,\n    COUNT(*) AS \"New Users\"\nFROM app_users\nWHERE created_at >= CURRENT_DATE - INTERVAL '3 months'\nGROUP BY month, user_type;"
+  },
+  {
+    "question": "how are you",
+    "sql": "SELECT \n    SUM(upe.points) AS \"Total Points Earned\"\nFROM \n    user_point_entries upe\nLEFT JOIN app_users au ON upe.id = au.id\nWHERE \n    status = '1'\n    AND is_reverted = FALSE\n    AND DATE(upe.created_at) >= '2025-02-15'\n    AND DATE(upe.created_at) <= '2025-02-28'\n    AND au.state ILIKE '%Rajasthan%'"
+  },
+  {
+    "question": "give me  five top carpenters of gujarat and delhi based on redeemed points in april",
+    "sql": "SELECT \n    au.name as User_Name,\n    au.mobile as Phone_Number,\n    urp.city as Location_City,\n    au.state as State,\n    SUM(urp.points) as Total_Points\nFROM \n    app_users au\nLEFT JOIN \n    user_point_redemptions urp ON \n    au.id = urp.app_user_id\nWHERE \n    au.user_type LIKE '%carpenter%'\n    AND au.state IN ('Gujarat', 'Delhi')\n    AND urp.redemption_date BETWEEN '2025-04-01' AND '2025-04-30'\n    AND urp.status != '0'\nGROUP BY \n    au.id\nORDER BY \n    Total_Points DESC;"
+  },
+  {
+    "question": "give me  five top carpenters of gujarat and delhi based on redeemed points all time",
+    "sql": "SELECT \n    au.name AS Carpenter_Name,\n    SUM(urp.points) AS Total_Deemed_Points,\n    au.city AS City\nFROM \n    user_point_redemptions urp\nJOIN \n    app_users au ON au.id = urp.app_user_id\nWHERE \n    au.user_type = 'carpenter'\n    AND au.state IN ('Gujarat', 'Delhi')\n    AND urp.status != '0'\nGROUP BY \n    au.name, au.city\nORDER BY \n    Total_Deemed_Points DESC\nLIMIT 5;"
+  },
+  {
+    "question": "how many qr scaneed in april by the dealers",
+    "sql": "SELECT COUNT(entry_id) AS \"Number of Scans\"\nFROM user_point_entries upe\nJOIN app_users au ON upe.id = au.id\nWHERE \n    upe.is_reverted = FALSE \n    AND TO_CHAR(upe.created_at, 'YYYY-MM') = '2025-04'\n    AND au.user_type LIKE '%dealer%'\n    AND upe.points > 0;"
+  },
+  {
+    "question": "how many points redeemed in march month",
+    "sql": "SELECT SUM(points) AS \"Total Points Redeemed\" \nFROM user_point_redemptions \nWHERE status != '0' \nAND DATE(created_at) BETWEEN '2025-03-01' AND '2025-03-31';"
+  },
+  {
+    "question": "choose random carpeters and give me there phone number and locations city and state",
+    "sql": "SELECT au.mobile AS \"Phone Number\", au.city AS \"City\", au.state AS \"State\"\nFROM app_users au\nJOIN (\n    SELECT entry_id, city, district, state\n    FROM user_point_locations\n    WHERE is_reverted = FALSE AND points > 0\n    ORDER BY RAND()\n    LIMIT 5\n) upl ON upl.entry_id = au.id\nWHERE au.user_type LIKE '%carpenter%';"
+  },
+  {
+    "question": "choose random 51 carpenters and give me there phone number and locations city and state",
+    "sql": "WITH total_carpenters AS (\n    SELECT COUNT(*) total\n    FROM app_users\n    WHERE user_type LIKE '%carpenter%' AND state ILIKE '%Rajasthan%'\n),\nrandom_indices AS (\n    SELECT generate_series(1, total.total) AS index\n)\nSELECT au.name, au.mobile, au.city, au.state\nFROM app_users au\nJOIN random_indices ri ON au.id = (SELECT id FROM app_users WHERE user_type LIKE '%carpenter%' AND state ILIKE '%Rajasthan%' LIMIT ri.index OFFSET (ri.index - 1))\nWHERE user_type LIKE '%carpenter%' AND state ILIKE '%Rajasthan%'\nLIMIT 51;"
+  },
+  {
+    "question": "choose random 51 carpenters and give me there phone number and locations city and state and name",
+    "sql": "WITH carpenter_ids AS (\n    SELECT id, name, mobile, city, state FROM app_users\n    WHERE user_type ILIKE '%carpenter%'\n)\nSELECT carpenter_ids.name, carpenter_ids.mobile, carpenter_locations.city, carpenter_locations.state\nFROM carpenter_ids\nJOIN (\n    SELECT entry_id, city, district, state FROM user_point_locations\n    WHERE user_type ILIKE '%carpenter%'\n) AS carpenter_locations\nON carpenter_ids.id = carpenter_locations.entry_id\nLIMIT 51;"
+  },
+  {
+    "question": "tell me name mobile and location of those carpenters who earned less than 500 points in march",
+    "sql": "SELECT\n    au.name AS \"Name\",\n    au.mobile AS \"Mobile Number\",\n    GROUP_CONCAT(upl.city SEPARATOR ', ') AS \"Location\"\nFROM\n    app_users au\nJOIN\n    user_point_entries upe ON upe.app_user_id = au.id\nJOIN\n    user_point_locations upl ON upl.entry_id = upe.id\nWHERE\n    au.user_type LIKE '%carpenter%'\n    AND upe.is_reverted = FALSE\n    AND upe.points < 500\n    AND DATE(upe.created_at) >= '2025-03-01'\n    AND DATE(upe.created_at) <= '2025-03-31'\n    AND upe.status != '0'\nGROUP BY au.id;"
+  },
+  {
+    "question": "tell me name mobile, points  and location of those carpenters who earned less than 500 points in march",
+    "sql": "SELECT\n    au.name AS \"Carpenter Name\",\n    au.mobile AS \"Mobile Number\",\n    CONCAT(au.city, ', ', upl.district, ', ', au.state) AS \"Location\",\n    SUM(upe.points) AS \"Total Points Earned in March\"\nFROM\n    app_users au\nJOIN\n    user_point_entries upe ON au.id = upe.app_user_id\nLEFT JOIN\n    user_point_locations upl ON upe.id = upl.entry_id\nWHERE\n    upe.created_at >= '2025-03-01'\n    AND upe.created_at <= '2025-03-31'\n    AND au.user_type LIKE '%carpenter%'\n    AND upe.points < 500\n    AND upe.is_reverted = FALSE\nGROUP BY\n    au.name, au.mobile, upl.city, upl.district, upl.state;"
+  },
+  {
+    "question": "how many carpenters registered in march month",
+    "sql": "SELECT COUNT(*) AS \"Number of Carpenters Registered in March\"\nFROM app_users\nWHERE user_type LIKE '%carpenter%' AND TO_CHAR(created_at, 'YYYY-MM') = '2025-03';"
+  },
+  {
+    "question": "how many qr scanned in last four months",
+    "sql": "SELECT COUNT(*) AS \"Total QR Scans in Last Four Months\"\nFROM user_point_entries upe\nWHERE is_reverted = FALSE AND points > 0\nAND DATE(upe.created_at) >= CURRENT_DATE - INTERVAL '4 months';"
+  },
+  {
+    "question": "tell me those carpenters who earned less than 500 points in march month",
+    "sql": "SELECT \n    app_users.name,\n    SUM(user_points.point_earned) AS total_points\nFROM \n    app_users\nLEFT JOIN \n    user_points ON app_user_id = app_users.id\nWHERE \n    user_type LIKE '%carpenter%' \n    AND DATE(created_at) BETWEEN '2025-03-01' AND '2025-03-31'\n    AND SUM(user_points.point_earned) < 500;"
+  },
+  {
+    "question": "tell me the carpenter count only gujrat state",
+    "sql": "SELECT COUNT(*) AS \"Carpenters in Gujarat\"\nFROM app_users\nWHERE user_type LIKE '%carpenter%' \n  AND state ILIKE '%Gujarat%';"
+  },
+  {
+    "question": "tell me the carpenter name and phone number from delhi",
+    "sql": "SELECT \n    au.name AS \"Carpenter Name\",\n    au.mobile AS \"Phone Number\"\nFROM \n    app_users au\nINNER JOIN\n    user_point_locations upl ON au.id = upl.entry_id\nWHERE \n    au.user_type ILIKE '%carpenter%' \n    AND upl.city ILIKE '%Delhi%';"
+  },
+  {
+    "question": "how to grow my sell",
+    "sql": "with the app or services.\n\n2. **Total Points Redeemed Query**: This shows how many points have been redeemed in a given timeframe. High redemption rates can indicate successful sales strategies, especially if points are tied to rewards or discounts.\n\n3. **Dealers' Performance Query**: Since dealers earn cash per point, this query helps track their earnings, which could be key to understanding their motivation and performance in generating sales.\n\n4. **Product Scan Location Query**: This shows where specific products are being scanned and how often. Knowing popular locations can help target marketing efforts there.\n\n5. **Carpenters' Limit Query**: Carpenters have daily limits on scans and transaction caps. Understanding these limits could reveal if they're bottlenecks affecting sales growth.\n\n6. **Fabricators' Redemption Requirement Query**: Fabricators need a certain number of points to redeem, which might influence their sales strategies by encouraging more point accumulation.\n\nNow, thinking about how these queries can be combined to answer \"how to grow my sales,\" I realize that understanding user behavior, redemption patterns, and location-specific performance is crucial. For example, if a region has high scanning activity, focusing marketing there could boost sales. Also, analyzing redemption rates compared to points earned might highlight inefficiencies or opportunities.\n\nI should also consider the business rules for each user type, like cash-per-point rates and transaction limits, as these can impact their ability to contribute to sales growth. For instance, if dealers are earning less than expected, maybe increasing their cash-per-point rate could incentivize more activity.\n\nAnother angle is tracking when redemptions peak. If most users redeem points after a specific date range, aligning promotions or deals during those periods might increase sales.\n\nI also need to make sure that I'm using the correct filters, especially for states like Rajasthan, as focusing on specific regions can provide more targeted insights. For example, if Rajasthan has high redemption rates, understanding why could help replicate that success elsewhere.\n\nAdditionally, looking at user-wise redemptions with names and locations can help identify top performers, who can be leveraged for referrals or testimonials to attract more users.\n\nLastly, ensuring that all queries exclude reversed transactions (is_reverted = FALSE) is important for accurate sales growth metrics. Points are only counted if they're valid earnings, which helps in avoiding overcounting.\n\nIn summary, using these SQL queries together can provide a comprehensive view of sales performance, user behavior, and opportunities to optimize strategies for growth.\n</think>\n\nTo address the question of how to grow sales using the provided SQL queries, here's a structured approach that combines key insights from various queries:\n\n### Key Strategies for Sales Growth:\n\n1. **Leverage User Activity:**\n   - Use the `Total Points Earned` and `Total Points Redeemed` queries to track user engagement.\n   - Analyze redemption rates compared to points earned to identify inefficiencies or opportunities.\n\n2. **Focus on High-Performing Regions:**\n   - Utilize the `Product Scan Location` query to target areas with high scanning activity for localized marketing efforts.\n\n3. **Optimize User Roles:**\n   - For dealers, consider increasing their cash-per-point rate to incentivize higher sales.\n   - Understand carpenters' limits and transaction caps; adjust these if bottlenecks are identified.\n\n4. **Align Promotions with Redemption Peaks:**\n   - Determine peak redemption periods using the `Total Points Redeemed` query and align promotions during those times.\n\n5. **Target High-Performing Users:**\n   - Use the user-wise redemption query to identify top performers and leverage their influence for referrals or testimonials.\n\n6. **Ensure Data Integrity:**\n   - Continuously ensure that is_reverted = FALSE in all queries to exclude reversed transactions, providing accurate sales metrics.\n\n### Actionable Steps:\n\n1. **Analyze Redemption Timing:**\n   - Run the `Total Points Redeemed` query across different date ranges to identify peak redemption periods and plan promotions accordingly.\n\n2. **Evaluate User Performance by Region:**\n   - Combine region-specific scans with user performance data (e.g., Rajasthan) to tailor marketing strategies for maximum impact.\n\n3. **Adjust Dealer Incentives:**\n   - Modify cash-per-point rates for dealers if their earnings are below expectations, aiming to boost sales through increased motivation.\n\n4. **Monitor Carpenters' Limits:**\n   - Review daily scan and transaction limits to ensure they aren't restricting potential sales growth; consider adjustments based on performance data.\n\n5. **Highlight Top Performers:**\n   - Use detailed user redemption reports to showcase successful users, potentially using them as advocates or influencers for new sign-ups.\n\n### Conclusion:\n\nBy integrating these strategies and utilizing the provided SQL queries effectively, it is possible to gain a deeper understanding of sales performance, user behavior, and opportunities for growth. This comprehensive approach ensures that all aspects of sales are optimized, leading to sustained and scalable growth."
+  },
+  {
+    "question": "give me all data",
+    "sql": "SELECT \n    au.*,\n    SUM(upe.points) AS total_points_earned,\n    SUM(urp.points) AS total_points_redeemed,\n    COUNT(*) AS total_scans,\n    COUNT(urp.id) AS total_redemptions\nFROM \n    app_users au\nLEFT JOIN \n    user_point_entries upe ON au.id = upe.app_user_id\nLEFT JOIN \n    user_point_redemptions urp ON au.id = urp.app_user_id\nLEFT JOIN \n    user_point_locations upl ON upe.id = upl.entry_id\nWHERE \n    upe.is_reverted = FALSE\n    AND urp.status != '0'\nGROUP BY \n    au.name, au.phone_number, au.city, au.state;"
+  },
+  {
+    "question": "total point redeemed and earned point by user whose phone number 9096036658",
+    "sql": "SELECT SUM(`points`) AS total_redeeming_points\nFROM `user_point_redemptions`\nWHERE `user_id` = (SELECT `id` FROM `app_users` WHERE `mobile` = '9096036658')\nAND `status` != '0';"
   }
 ]

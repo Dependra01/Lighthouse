@@ -3,6 +3,7 @@ from config.ollama_config import chat_with_model
 from data.qa_bank import canonical_qa_bank
 from .examples import few_shot_examples
 from rag.semantic_retriever import retrieve_similar_question
+from rag.schema_retriever import retrieve_schema_chunks
 from utils.text_utils import normalize_question
 import subprocess
 import json
@@ -537,9 +538,10 @@ def ask_llm(user_question: str) -> dict:
         }
     # Step 3: Call LLM
     try:
+        schema_context = "\n\n".join(retrieve_schema_chunks(user_question))
         response = chat_with_model(
             prompt=user_question,
-            system_prompt=SCHEMA_PRIMER + "\n\n" + SYSTEM_PROMPT + "\n\n" + FEW_SHOTS,
+            system_prompt=SCHEMA_PRIMER + "\n\n" + SYSTEM_PROMPT + "\n\n" + FEW_SHOTS + "\n\n" + schema_context,
             temperature=0.3
         )
 
