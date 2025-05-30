@@ -230,5 +230,73 @@
   {
     "question": "who are you",
     "sql": "SELECT \n    au.name AS \"User Name\",\n    au.mobile AS \"Phone Number\",\n    au.city AS \"City\",\n    au.state AS \"State\",\n    SUM(urp.points) AS \"Total Points Redeemed\"\nFROM \n    user_point_redemptions urp\nJOIN \n    app_users au ON urp.app_user_id = au.id\nWHERE \n    DATE(urp.created_at) >= '2025-03-01' \n    AND DATE(urp.created_at) <= '2025-03-31'\n    AND urp.status != '0'\nGROUP BY \n    au.name, au.mobile, au.city, au.state\nORDER BY \n    \"Total Points Redeemed\" DESC;"
+  },
+  {
+    "question": "how many carpenters are in rajasthan?",
+    "sql": "SELECT COUNT(*) AS \"Carpenters in Rajasthan\"\nFROM app_users\nWHERE user_type LIKE '%carpenter%' \n  AND state ILIKE '%Rajasthan%;"
+  },
+  {
+    "question": "which fabricator did the most scans in march?",
+    "sql": "SELECT \n    ue.id AS scan_id,\n    au.user_type AS user_type,\n    COUNT(ue.id) AS total_scans\nFROM \n    user_point_entries ue\nLEFT JOIN \n    app_users au ON au.id = ue.app_user_id\nWHERE \n    ue.is_reverted = FALSE \n    AND DATE(ue.created_at) BETWEEN '2025-03-01' AND '2025-03-31'\n    AND ue.user_type ILIKE '%fabricator%'\nGROUP BY \n    au.user_type, au.id\nORDER BY \n    total_scans DESC;"
+  },
+  {
+    "question": "which city had the highest scans last month?",
+    "sql": "SELECT \n    upl.city AS \"City\",\n    COUNT(*) AS \"Total Scans\"\nFROM \n    user_point_entries upe\nLEFT JOIN \n    user_point_locations upl ON upe.id = upl.entry_id\nWHERE \n    DATE(upe.created_at) >= DATE(NOW() - INTERVAL '1 month') - INTERVAL '1 day'  -- Last month's scans\n    AND upe.status = '1'\n    AND upe.is_reverted = FALSE;\nGROUP BY \n    upl.city\nORDER BY \n    COUNT(*) DESC;"
+  },
+  {
+    "question": "show top 5 cities with highest total redemptions",
+    "sql": "SELECT \n    au.city AS City,\n    SUM(urp.points) AS Total_Redemptions\nFROM \n    user_point_redemptions urp\nJOIN \n    app_users au ON au.id = urp.app_user_id\nWHERE \n    urp.status != '0'\n    AND DATE(urp.created_at) >= '2025-03-01'\n    AND DATE(urp.created_at) <= '2025-03-31'\n    AND au.city IS NOT NULL\nGROUP BY \n    au.city\nORDER BY \n    Total_Redemptions DESC\nLIMIT 5;"
+  },
+  {
+    "question": "show top 5 cities with highest total redemptions based on each type of redemptions",
+    "sql": "WITH city_redemption AS (\n    SELECT \n        urp.app_user_id,\n        au.name AS user_name,\n        au.mobile AS phone_number,\n        au.city AS city,\n        au.state AS state,\n        upl.location AS location,\n        SUM(CASE WHEN redemption_type = 'Type1' THEN points END) AS type1_points,\n        SUM(CASE WHEN redemption_type = 'Type2' THEN points END) AS type2_points,\n        SUM(CASE WHEN redemption_type = 'Type3' THEN points END) AS type3_points\n    FROM \n        user_point_redemptions urp\n    JOIN app_users au ON urp.app_user_id = au.id\n    JOIN user_point_locations upl ON urp.id = upl.entry_id\n    WHERE \n        urp.status != '0'\n    GROUP BY \n        urp.app_user_id, city\n    ORDER BY \n        (type1_points + type2_points + type3_points) DESC,\n        type1_points DESC,\n        type2_points DESC,\n        type3_points DESC\n)\nSELECT \n    city,\n    user_name,\n    phone_number,\n    state,\n    location,\n    type1_points + type2_points + type3_points AS total_points,\n    type1_points AS type1_count,\n    type2_points AS type2_count,\n    type3_points AS type3_count\nFROM city_redemption\nGROUP BY \n    city\nORDER BY \n    total_points DESC\nLIMIT 5;"
+  },
+  {
+    "question": "total points redeemed by each type of redemption",
+    "sql": "SELECT  \n    redemption_type AS \"Redemption Type\",\n    SUM(points) AS \"Total Points\"\nFROM \n    user_point_redemptions\nWHERE \n    status != '0'\nGROUP BY \n    redemption_type;"
+  },
+  {
+    "question": "new users in march month user type wise?",
+    "sql": "SELECT \n    app_user_type.user_type AS \"User Type\",\n    COUNT(*) AS \"New Users\"\nFROM \n    app_users\nJOIN \n    app_user_type ON app_users.id = app_user_type.user_id\nWHERE \n    DATE(app_users.created_at) >= '2025-03-01' AND\n    DATE(app_users.created_at) <= '2025-03-31'\nGROUP BY \n    app_user_type.user_type;"
+  },
+  {
+    "question": "new users in last 6  month user type wise and month wise",
+    "sql": "SELECT \n    EXTRACT(month FROM created_at) AS month,\n    user_type,\n    COUNT(*) AS new_users\nFROM \n    app_users\nWHERE \n    DATE(created_at) >= DATE(CURRENT_DATE) - INTERVAL '6 months'\n    AND user_type LIKE '%dealer%'\n    OR user_type LIKE '%carpenter%'\n    OR user_type LIKE '%other%';\nGROUP BY \n    EXTRACT(month FROM created_at), user_type;"
+  },
+  {
+    "question": "list all transactions over 1000 points",
+    "sql": "SELECT \n    app_user_id,\n    user_type_id,\n    SUM(points) AS total_points,\n    created_at,\n    product_code,\n    product_name\nFROM \n    user_point_entries\nWHERE \n    points > 0 AND is_reverted = FALSE AND SUM(points) > 1000\nGROUP BY \n    app_user_id, user_type_id\nORDER BY \n    total_points DESC; OR SELECT * FROM user_point_entries WHERE points > 1000 AND is_reverted = FALSE;"
+  },
+  {
+    "question": "total points redeemed by each type of redemption in march month of 2025",
+    "sql": "SELECT \n    urp.redemption_type,\n    SUM(urp.points) AS \"Total Points\"\nFROM \n    user_point_redemptions urp\nWHERE \n    urp.status != '0' \n    AND created_at BETWEEN '2025-03-01' AND '2025-03-31'\nGROUP BY \n    urp.redemption_type;"
+  },
+  {
+    "question": "name and phone number whose total points redeemed greater than 2000 points also there redemption type in march month of 2025",
+    "sql": "SELECT \n    au.name AS \"User Name\",\n    au.mobile AS \"Phone Number\",\n    SUM(urp.points) AS \"Total Points Redeemed\",\n    COUNT(DISTINCT urp.redemption_type) AS \"Redemption Types\"\nFROM \n    user_point_redemptions urp\nJOIN \n    app_users au ON urp.app_user_id = au.id\nWHERE \n    urp.status != '0' AND \n    DATE(urp.created_at) BETWEEN '2025-03-01' AND '2025-03-31' AND\n    SUM(urp.points) > 2000\nGROUP BY \n    au.name, au.mobile\nORDER BY \n    SUM(urp.points) DESC;"
+  },
+  {
+    "question": "which city had the highest scans last month",
+    "sql": "SELECT \n    upl.city AS City,\n    COUNT(*) AS Scan_Count\nFROM \n    user_point_locations upl\nJOIN \n    user_point_entries upe ON upe.id = upl.entry_id\nWHERE \n    DATE(upe.created_at) >= DATE('current_date') - INTERVAL '1 month' \n    AND DATE(upe.created_at) <= CURRENT_DATE\nGROUP BY \n    upl.city\nORDER BY \n    Scan_Count DESC;"
+  },
+  {
+    "question": "show names and mobile numbers of users who redeemed more than 3000 points in march 2025",
+    "sql": "SELECT \n    au.name,\n    au.mobile\nFROM \n    app_users au\nJOIN \n    user_point_redemptions urp ON au.id = urp.app_user_id\nWHERE \n    urp.status != '0' AND \n    urp.points > 3000 AND \n    DATE(urp.created_at) >= '2025-03-01' AND \n    DATE(urp.created_at) <= '2025-03-31'\nGROUP BY \n    au.name, au.mobile\nHAVING \n    SUM(urp.points) > 3000;"
+  },
+  {
+    "question": "show users who redeemed in redemption types 1, 2, 3 in march 2025 also total points each type redemption",
+    "sql": "SELECT \n    urp.app_user_id,\n    au.name AS \"User Name\",\n    au.email,\n    au.phone,\n    au.address,\n    au.city,\n    au.state,\n    au.country,\n    urp.redemption_type,\n    SUM(urp.points) AS \"Total Points\",\n    CASE \n        WHEN urp.redemption_type = 1 THEN urp.points\n        ELSE 0\n    END AS \"Gift Points\",\n    CASE \n        WHEN urp.redemption_type = 2 THEN urp.points\n        ELSE 0\n    END AS \"Cash Points\",\n    CASE \n        WHEN urp.redemption_type = 3 THEN urp.points\n        ELSE 0\n    END AS \"Coupon Points\"\nFROM \n    user_point_redemptions urp\nJOIN \n    app_users au ON urp.app_user_id = au.id\nWHERE \n    urp.redemption_type IN (1, 2, 3)\n    AND urp.status != '0'\n    AND urp.created_at BETWEEN '2025-03-01' AND '2025-03-31'\nGROUP BY \n    urp.app_user_id,\n    au.name,\n    au.email,\n    au.phone,\n    au.address,\n    au.city,\n    au.state,\n    au.country\nORDER BY \n    \"Total Points\" DESC;"
+  },
+  {
+    "question": "show users who redeemed in redemption types  in march 2025 also total balance points each type redemption",
+    "sql": "SELECT \n    a.first_name,\n    a.last_name,\n    a.mobile,\n    a.email,\n    a.city,\n    a.state,\n    ur.redeeming_type,\n    SUM(ur.points) as total_points\nFROM \n    app_users a\nLEFT JOIN user_point_redemptions ur ON a.id = ur.app_user_id\nWHERE \n    ur.status != '0' AND DATE(ur.created_at) BETWEEN '2025-03-01' AND '2025-03-31'\nGROUP BY \n    a.first_name, a.last_name, a.mobile, a.email, a.city, a.state, ur.redeeming_type\nORDER BY \n    total_points DESC;"
+  },
+  {
+    "question": "show users who redeemed in redemption types  in march 2025",
+    "sql": "SELECT \n    au.name AS User_Name,\n    au.mobile AS Phone_Number,\n    au.city AS City,\n    au.state AS State,\n    SUM(urp.points) AS Total_Redemptions\nFROM \n    user_point_redemptions urp\nJOIN \n    app_users au ON au.id = urp.app_user_id\nWHERE \n    DATE(urp.created_at) BETWEEN '2025-03-01' AND '2025-03-31'\n    AND urp.status != '0'\n    AND urp.redemption_type IN (1, 2, 3, 4)\nGROUP BY \n    au.name, au.mobile, au.city, au.state\nORDER BY \n    Total_Redemptions DESC;"
+  },
+  {
+    "question": "give me the name and total redeemed points per user in march",
+    "sql": "SELECT \n    au.name AS User_Name,\n    SUM(urp.points) AS Total_Dedemered_Points\nFROM \n    app_users au\nJOIN \n    user_point_redemptions urp ON au.id = urp.app_user_id\nWHERE \n    DATE(urp.created_at) BETWEEN '2025-03-01' AND '2025-03-31'\n    AND urp.status != '0'\nGROUP BY \n    au.name, au.id;"
   }
 ]

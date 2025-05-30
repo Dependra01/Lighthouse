@@ -133,6 +133,7 @@ Key Columns:
 - id (PK): Internal ID of the user (used for joins)
 - user_id: App login ID (e.g., 'carpenter_228918') — do not use in analytics
 - name: User’s name
+- user_type: Role key used for filtering (e.g., 'dealer', 'carpenter')
 - mobile: The only valid column for phone number. Use this for contact info. DO NOT guess `phone`.
 - city / district / state: Use these for location fields. There is NO column named `location`.
 - user_type_id: FK → app_user_type.user_type_id
