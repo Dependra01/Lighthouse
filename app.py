@@ -1,44 +1,37 @@
+# app.py
+
 import streamlit as st
 from agents.query_agent import process_question
 
 st.set_page_config(page_title="HybridOcean AI", layout="centered")
 
 st.title("💡 HybridOcean AI")
-st.caption("Ask anything about your loyalty program data")
+st.markdown("Ask anything about your loyalty program data 👇")
 
-# --- Init memory ---
-if "chat_memory" not in st.session_state:
-    st.session_state.chat_memory = []
+# User input
+question = st.text_area("📨 Your Question", height=100, placeholder="e.g., How many points did carpenter_228918 earn?")
 
-# --- Display past conversation ---
-with st.container():
-    for entry in st.session_state.chat_memory:
-        with st.chat_message("user"):
-            st.markdown(entry["question"])
-        with st.chat_message("assistant"):
-            st.markdown("**SQL**")
-            st.code(entry["sql"], language="sql")
-            st.markdown("**Result**")
-            st.dataframe(entry["result"])
+if st.button("🔍 Ask"):
+    if not question.strip():
+        st.warning("Please enter a question.")
+    else:
+        with st.spinner("Analysing..."):
+            response = process_question(question)
 
-# --- New chat input ---
-user_question = st.chat_input("Ask your next question...")
-
-if user_question:
-    with st.chat_message("user"):
-        st.markdown(user_question)
-
-    with st.spinner("💭 Thinking..."):
-        response = process_question(user_question)
-
-    with st.chat_message("assistant"):
         if "error" in response:
-            st.error(response["error"])
+            st.error(f"❌ {response['error']}")
             if "model_reply" in response:
                 st.code(response["model_reply"], language="markdown")
         else:
             st.success("✅ Query executed successfully!")
-            st.markdown("**SQL**")
-            st.code(response["sql"], language="sql")
-            st.markdown("**Result**")
-            st.dataframe(response["result"])
+            st.markdown("### 💬 Model Reply")
+            st.code(response['model_reply'], language="markdown")
+
+            st.markdown("### 🧠 SQL Used")
+            st.code(response['sql'], language="sql")
+
+            st.markdown("### 📊 Result")
+            if response["result"]:
+                st.dataframe(response["result"])
+            else:
+                st.warning("Query ran fine but no rows were returned.")
