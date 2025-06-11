@@ -13,8 +13,10 @@ SCHEMA_LABELS_PATH = "data/schema_labels.json"
 # Reuse embedding subprocess safely
 def encode_text(text):
     result = subprocess.run(
-        ['python', 'embedding_model_runner.py', text],
-        capture_output=True, text=True
+        ["python", "embedding_model_runner.py"],
+        input=text,
+        text=True,
+        capture_output=True
     )
     return np.array(json.loads(result.stdout))
 
