@@ -17,15 +17,33 @@ class DecimalEncoder(json.JSONEncoder):
 if 'chat_memory' not in st.session_state:
     st.session_state.chat_memory = []
 
+def build_memory_context() -> str:
+    memory = st.session_state.chat_memory[-5:]  # Use last 3 turns
+    context = ""
+    for turn in memory:
+        context += f"User asked: {turn['question']}\n"
+        context += f"Model used SQL:\n{turn['sql']}\n"
+    return context
+
 def process_question(user_question: str) -> dict:
     """
-    Simplified reasoning-first agent:
-    - Sends user question directly to DeepSeek
-    - Lets model reason freely (not limited to SQL)
-    - Executes SQL if model chooses to generate it
-    - Multi-turn memory is enabled, but no manual injection needed
+    Reasoning-first agent with automatic context injection:
+    - Uses last 5 turns of memory
+    - Instructs model to ask back when uncertain
+    - Executes SQL only if model chooses to generate it
     """
-    llm_response = ask_llm(user_question)
+    memory_context = build_memory_context()
+    disambiguation_instruction = """
+        Reasoning Rule:
+            If the user's question is ambiguous or refers to a group (e.g., “carpenters”, “Delhi”, “top products”) 
+            without specifying what metric or time frame they care about:
+            - Do NOT assume.
+            - Politely ask a clarifying question before proceeding.
+            Refer to earlier questions for context, but always confirm if unclear.
+    """
+
+    enriched_prompt = f"{disambiguation_instruction}\n\n{memory_context}\nNow answer this: {user_question}"
+    llm_response = ask_llm(enriched_prompt)
     model_reply = llm_response["model_reply"]
     sql = llm_response["sql_used"]
 
