@@ -45,7 +45,10 @@ def process_question(user_question: str) -> dict:
 
     enriched_prompt = f"{disambiguation_instruction}\n\n{memory_context}\nNow answer this: {user_question}"
     llm_response = ask_llm(enriched_prompt)
+    print("\n🧠 Full model response (raw, with <think>):")
+    print(llm_response["model_reply"])
     model_reply = re.sub(r"<think>.*?</think>", "", llm_response["model_reply"], flags=re.DOTALL).strip()
+    model_reply = re.sub(r"(deepseek|openai|genefied)", "HybridOcean", model_reply, flags=re.IGNORECASE)
     sql = extract_sql_only(model_reply)
 
     print("\n🟦 SQL from model (if any):")
@@ -71,11 +74,21 @@ def process_question(user_question: str) -> dict:
                 result = conn.execute(text(sql)).mappings().all()
                 rows = [dict(row) for row in result]
 
+            # Clean up reply for final UI
+            clean_reply = model_reply
+            if "select" in model_reply.lower() and rows:
+                if len(rows) == 1 and len(rows[0]) == 1:
+                    key = list(rows[0].keys())[0]
+                    count = rows[0][key]
+                    clean_reply = f"The result is: **{count}**."
+                else:
+                    clean_reply = "Here's the result based on your query."
+
             memory_entry = {
                 "question": user_question,
                 "sql": sql,
                 "result": rows,
-                "model_reply": model_reply
+                "model_reply": clean_reply
             }
             st.session_state.chat_memory.append(memory_entry)
 
@@ -83,7 +96,7 @@ def process_question(user_question: str) -> dict:
                 "question": user_question,
                 "sql": sql,
                 "result": rows,
-                "model_reply": model_reply
+                "model_reply": clean_reply
             }
 
         except Exception as e:
