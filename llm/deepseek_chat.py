@@ -444,19 +444,22 @@ SQL:  SELECT
              SUM(urp.points) DESC;
 """
 
-
 # --- Extract SQL from model response ---
 def extract_sql_only(response: str) -> str:
+    # Try SQL inside code block
     match = re.search(r"```sql\s*(.*?)```", response, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
 
-    match = re.search(r"(SELECT|WITH)\s.*", response, re.IGNORECASE | re.DOTALL)
+    # Fallback to inline SQL only if it's early and not mixed with long text
+    match = re.search(r"\b(SELECT|WITH)\b\s.*", response, re.IGNORECASE | re.DOTALL)
     if match:
-        return match.group(0).strip()
+        # Make sure it's not deep inside a paragraph
+        before = response[:match.start()].strip()
+        if len(before.split()) < 10:
+            return match.group(0).strip()
 
-    return response.strip()
-
+    return ""  # Don't risk executing reasoning
 
 # --- Log non-canonical questions for feedback training ---
 def log_question_and_sql(question: str, sql: str):

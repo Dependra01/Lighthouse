@@ -5,6 +5,7 @@ from utils.sql_repairer import try_fix_known_sql_errors
 import json
 import streamlit as st
 import decimal
+import re
 
 MAX_RETRY_ATTEMPTS = 1
 
@@ -44,8 +45,8 @@ def process_question(user_question: str) -> dict:
 
     enriched_prompt = f"{disambiguation_instruction}\n\n{memory_context}\nNow answer this: {user_question}"
     llm_response = ask_llm(enriched_prompt)
-    model_reply = llm_response["model_reply"]
-    sql = llm_response["sql_used"]
+    model_reply = re.sub(r"<think>.*?</think>", "", llm_response["model_reply"], flags=re.DOTALL).strip()
+    sql = extract_sql_only(model_reply)
 
     print("\n🟦 SQL from model (if any):")
     print(sql)
