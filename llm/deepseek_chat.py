@@ -445,21 +445,20 @@ SQL:  SELECT
 """
 
 # --- Extract SQL from model response ---
-def extract_sql_only(response: str) -> str:
-    # Try SQL inside code block
-    match = re.search(r"```sql\s*(.*?)```", response, re.DOTALL | re.IGNORECASE)
-    if match:
-        return match.group(1).strip()
+def extract_sql_blocks(response: str) -> list:
+    """
+    Extracts all standalone SQL SELECT/WITH statements from the model's response.
+    Returns a list of SQL strings.
+    """
+    # Try to extract all code blocks with SQL
+    code_blocks = re.findall(r"```sql(.*?)```", response, re.DOTALL | re.IGNORECASE)
+    if code_blocks:
+        # Clean and return all blocks found
+        return [block.strip() for block in code_blocks if "select" in block.lower() or "with" in block.lower()]
 
-    # Fallback to inline SQL only if it's early and not mixed with long text
-    match = re.search(r"\b(SELECT|WITH)\b\s.*", response, re.IGNORECASE | re.DOTALL)
-    if match:
-        # Make sure it's not deep inside a paragraph
-        before = response[:match.start()].strip()
-        if len(before.split()) < 10:
-            return match.group(0).strip()
-
-    return ""  # Don't risk executing reasoning
+    # Fallback: try to extract multiple SQLs based on 'SELECT ... ;' or 'WITH ... ;'
+    fallback_blocks = re.findall(r"(SELECT .*?;|WITH .*?;)", response, re.DOTALL | re.IGNORECASE)
+    return [block.strip() for block in fallback_blocks if "select" in block.lower() or "with" in block.lower()]
 
 # --- Log non-canonical questions for feedback training ---
 def log_question_and_sql(question: str, sql: str):
@@ -550,14 +549,15 @@ def ask_llm(user_question: str) -> dict:
         )
 
         model_reply = response.strip()
-        sql_used = extract_sql_only(model_reply)
+        sql_list = extract_sql_blocks(model_reply)
 
-        log_question_and_sql(user_question, sql_used)
+        log_question_and_sql(user_question, "\n\n".join(sql_list))
 
         return {
             "model_reply": model_reply,
-            "sql_used": sql_used
+            "sql_used": sql_list
         }
+
 
     except Exception as e:
         return {
