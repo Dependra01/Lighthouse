@@ -3,7 +3,7 @@
 import requests
 
 OLLAMA_HOST = "http://localhost:11434"
-MODEL_NAME = "deepseek-r1:14b"  # or "deepseek-chat:14b"
+MODEL_NAME = "mistral:latest"  # or "deepseek-chat:14b"
 
 def chat_with_model(prompt: str, system_prompt: str = "", temperature: float = 0.7):
     payload = {
