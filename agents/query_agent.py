@@ -81,6 +81,7 @@ def process_question(user_question: str) -> dict:
                     result = conn.execute(text(sql)).mappings().all()
                     rows.extend([dict(row) for row in result])
 
+            # Enhanced summary with smart layer (rules + LLM fallback)
             clean_reply = summarize_result_smart(rows, user_question)
 
             memory_entry = {

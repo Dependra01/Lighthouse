@@ -27,12 +27,28 @@ def summarize_sql_result(rows: list[dict], question: str) -> str:
         except Exception:
             return f"{keys[0]}: {a}, {keys[1]}: {b}"
 
-    # Case: 1 row with categories (e.g., user type, month)
-    if len(rows) == 1:
-        parts = [f"**{k}**: {v}" for k, v in rows[0].items()]
-        return "Here’s what I found: " + ", ".join(parts)
+    # Top-N pattern (e.g., city → count)
+    if len(rows) > 1 and len(rows[0]) == 2:
+        keys = list(rows[0].keys())
+        category_col, count_col = keys[0], keys[1]
 
-    # Case: multi-row with month/user_type breakdown
+        top_rows = rows[:5]
+        top_summary = ", ".join(
+            f"{r[category_col]} ({r[count_col]})" for r in top_rows if r[category_col] not in [None, ""]
+        )
+
+        # Check if top value is null/missing
+        null_row = next((r for r in rows if r[category_col] in [None, ""]), None)
+        if null_row:
+            null_count = null_row[count_col]
+            return (
+                f"Top {category_col}s by {count_col}: {top_summary}.\n"
+                f"⚠️ Note: {null_count} records have no `{category_col}` listed. Would you like to investigate?"
+            )
+
+        return f"Top {category_col}s by {count_col}: {top_summary}."
+
+    # Month or category-based breakdowns
     if any("month" in k.lower() for k in rows[0]) and "count" in str(rows[0].keys()).lower():
         return "Here’s a monthly breakdown of your data."
 
