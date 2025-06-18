@@ -1,5 +1,6 @@
 import streamlit as st
 from agents.query_agent import process_question
+# from utils.chart_renderer import render_chart_if_possible  for auto detection of graph
 
 st.set_page_config(page_title="HybridOcean AI", layout="centered")
 st.title("💡 HybridOcean AI")
