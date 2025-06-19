@@ -442,6 +442,11 @@ SQL:  SELECT
             au.name, au.mobile, au.city, au.state
         ORDER BY 
              SUM(urp.points) DESC;
+
+User: How many peoples login in april month ?
+SQL: SELECT COUNT(*) AS "Login Count"
+        FROM app_users
+        WHERE DATE(login_time) >= '2025-04-01' AND DATE(login_time) <= '2025-04-30';
 """
 
 # --- Extract SQL from model response ---

@@ -2,9 +2,16 @@ import streamlit as st
 from agents.query_agent import process_question
 # from utils.chart_renderer import render_chart_if_possible  for auto detection of graph
 
+# query_params = st.query_params
+# if query_params.get("page") == "visualize":
+#     st.switch_page("pages/Visualize.py")
+
 st.set_page_config(page_title="HybridOcean AI", layout="centered")
 st.title("💡 HybridOcean AI")
 st.caption("Ask anything about your loyalty program data")
+
+# if st.button("📊 Explore Visual Dashboard"):
+#     st.query_params["page"] = "visualize"
 
 # Initialize chat memory
 if "chat_memory" not in st.session_state:

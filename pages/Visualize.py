@@ -33,9 +33,9 @@ if "chat_memory" in st.session_state and st.session_state.chat_memory:
             fig = px.pie(df, names=x_axis, values=y_axis)
 
         fig.update_layout(
-            title=None,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
+            title= "HybridOcean AI",
+            plot_bgcolor="Black",
+            paper_bgcolor="Black",
             xaxis_title=x_axis.title(),
             yaxis_title=y_axis.title(),
         )
